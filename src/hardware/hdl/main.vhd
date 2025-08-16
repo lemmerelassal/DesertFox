@@ -185,6 +185,8 @@ type addr_t is array (natural range <>) of std_logic_vector(19 downto 0);
 
 signal i_mem_rdata : mem_rdata_t(PERIPHERAL_MAX-1 downto 0) := (others => (others => '0'));
 
+signal half_clk, quarter_clk, eighth_clk, sixteenth_clk : std_logic;
+signal clk_counter : std_logic_vector(6 downto 0);
 
 
 --- ILA
@@ -197,8 +199,24 @@ component ila_1 PORT (
 
 begin
 
+  process(rst, clk)
+begin
+    if rst = '1' then
+        clk_counter <= "0000000";
+    elsif rising_edge(clk) then
+        clk_counter <= clk_counter + "0000001";
+    end if;
+end process;
 
-  --clk <= CLK100MHZ;
+-- clk <= half_clk;
+
+half_clk <= '1' when clk_counter(1 downto 0) >= "10" else '0';
+quarter_clk <=  '1' when clk_counter(2 downto 0) >= "100" else '0';
+eighth_clk <=  '1' when clk_counter(3 downto 0) >= "1000" else '0';
+sixteenth_clk <= '1' when  clk_counter(4 downto 0) >= "10000" else '0';
+
+
+  clk <= CLK100MHZ;
   rst <= btn(0) or btn(1) or btn(2) or btn(3);
 
   inst_rdy <= '1';
@@ -296,7 +314,6 @@ begin
         we => registerfile_we
       );
 
-      clk <= CLK100MHZ;
 
 led(3 downto 0) <= int_gpio(3 downto 0);
 
