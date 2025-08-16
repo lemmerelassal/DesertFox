@@ -263,6 +263,23 @@ component eu_i is
     instruction, registerfile_rdata_rs1, registerfile_rdata_rs2, pc : in std_logic_vector(31 downto 0);
     data_wack, selected : in std_logic;
     funct3 : in std_logic_vector(2 downto 0);
+    funct7 : in std_logic_vector(6 downto 0);
+
+    imm, daddr, wdata, result : out std_logic_vector(31 downto 0);
+    use_rs1,use_rs2,use_rd, execution_done, decode_error, dwe : out std_logic
+  );
+end component;
+
+
+component eu_r is
+    generic (entry_point : std_logic_vector(31 downto 0) := X"80010000");
+
+  Port (
+    instruction, registerfile_rdata_rs1, registerfile_rdata_rs2, pc : in std_logic_vector(31 downto 0);
+    data_wack, selected : in std_logic;
+
+    funct3 : in std_logic_vector(2 downto 0);
+    funct7 : in std_logic_vector(6 downto 0);
 
     imm, daddr, wdata, result : out std_logic_vector(31 downto 0);
     use_rs1,use_rs2,use_rd, execution_done, decode_error, dwe : out std_logic
@@ -632,170 +649,29 @@ begin
         end case;
     end process;
 
+        eu_r_inst: eu_r PORT MAP(
+        --ins
+        instruction => instruction, pc=>pc,
+        registerfile_rdata_rs1 => registerfile_rdata_rs1,
+        registerfile_rdata_rs2 => registerfile_rdata_rs2,
+        data_wack => data_wack, funct3 => funct3, funct7 => funct7, selected => selected(to_integer(unsigned(R_TYPE))),
+        --outs
+        
+    imm => imm(to_integer(unsigned(R_TYPE))), daddr => daddr(to_integer(unsigned(R_TYPE))), wdata => wdata(to_integer(unsigned(R_TYPE))), result => result(to_integer(unsigned(R_TYPE))),
+    use_rs1 => use_rs1(to_integer(unsigned(R_TYPE))),use_rs2 => use_rs2(to_integer(unsigned(R_TYPE))),use_rd => use_rd(to_integer(unsigned(R_TYPE))), execution_done => execution_done(to_integer(unsigned(R_TYPE))), decode_error => decode_error(to_integer(unsigned(R_TYPE))), dwe => dwe(to_integer(unsigned(R_TYPE)))
+    );
 
-    decode_r_type: process(funct3, funct7, registerfile_rdata_rs1, registerfile_rdata_rs2, pc) --clk, pc)
-    begin
-        use_rs1(to_integer(unsigned(R_TYPE))) <= '1'; 
-        use_rs2(to_integer(unsigned(R_TYPE))) <= '1'; 
-        use_rd(to_integer(unsigned(R_TYPE))) <= '1';
-        -- next_pc(to_integer(unsigned(R_TYPE))) <= pc + X"00000004";
-        decode_error(to_integer(unsigned(R_TYPE))) <= '0';
-
-        for i in 0 to 7 loop
-        result(to_integer(unsigned(R_TYPE))) <= (others => '0');
-        end loop;
-
-
-        imm(to_integer(unsigned(R_TYPE))) <= registerfile_rdata_rs2;
-
-
-        execution_done(to_integer(unsigned(R_TYPE))) <= '1';
-        dec_counter(to_integer(unsigned(R_TYPE))) <= '0';
-
-         case funct3 is
-             when "000" =>
-                case funct7 is
-                    when "0000000" => -- ADD
-                        result(to_integer(unsigned(R_TYPE))) <= registerfile_rdata_rs1 + registerfile_rdata_rs2;
-
-                    when "0100000" => -- SUB
-                        result(to_integer(unsigned(R_TYPE))) <= registerfile_rdata_rs1 - registerfile_rdata_rs2;
-
-                    when others =>
-                        decode_error(to_integer(unsigned(R_TYPE))) <= '1';
-                end case;
-
-             when "001" => -- SLL
-                execution_done(to_integer(unsigned(R_TYPE))) <= '1';
-                result(to_integer(unsigned(R_TYPE))) <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(registerfile_rdata_rs2(4 downto 0))), false, true);
-                
-             when "010" => -- SLT
-                if signed(registerfile_rdata_rs1) < signed(registerfile_rdata_rs2) then
-                    result(to_integer(unsigned(R_TYPE))) <= X"00000001";
-                else
-                    result(to_integer(unsigned(R_TYPE))) <= (others => '0');
-                end if;
-
-             when "011" => -- SLTU
-                if unsigned(registerfile_rdata_rs1) < unsigned(registerfile_rdata_rs2) then
-                    result(to_integer(unsigned(R_TYPE))) <= X"00000001";
-                else
-                    result(to_integer(unsigned(R_TYPE))) <= (others => '0');
-                end if;
-
-             when "100" => -- XOR
-                result(to_integer(unsigned(R_TYPE))) <= registerfile_rdata_rs1 xor registerfile_rdata_rs2;
-
-            when "101" =>
-                -- execution_done(to_integer(unsigned(R_TYPE))) <= '0';
-
-                case funct7 is
-                    when "0000000" => -- SRL
-
-                        -- execution_done(to_integer(unsigned(R_TYPE))) <= '1';
-                        result(to_integer(unsigned(R_TYPE))) <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(registerfile_rdata_rs2(4 downto 0))), false, false);
-
-                    when "0100000" => -- SRA
-                        -- execution_done(to_integer(unsigned(R_TYPE))) <= '1';
-                        result(to_integer(unsigned(R_TYPE))) <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(registerfile_rdata_rs2(4 downto 0))), true, false);
-
-                    when others =>
-                        decode_error(to_integer(unsigned(R_TYPE))) <= '1';
-                end case;
-
-            when "110" => -- OR
-                result(to_integer(unsigned(R_TYPE))) <= registerfile_rdata_rs1 or registerfile_rdata_rs2;
-
-            when "111" => -- AND
-                result(to_integer(unsigned(R_TYPE))) <= registerfile_rdata_rs1 and registerfile_rdata_rs2;
-            when others =>
-                 decode_error(to_integer(unsigned(R_TYPE))) <= '1';
-         end case;
-    end process;
-
-    -- decode_i_type: process(instruction, funct3, funct7, registerfile_rdata_rs1, pc) --clk, pc)
-    -- begin
-    --     imm(to_integer(unsigned(I_TYPE))) <= decode_imm(instruction);
-
-    --     decode_error(to_integer(unsigned(I_TYPE))) <= '0';
-    --     execution_done(to_integer(unsigned(I_TYPE))) <= '1';
-    --     -- next_pc(to_integer(unsigned(I_TYPE))) <= pc + X"00000004";
-
-    --     use_rs1(to_integer(unsigned(I_TYPE))) <= '1'; 
-    --     use_rs2(to_integer(unsigned(I_TYPE))) <= '1'; 
-    --     use_rd(to_integer(unsigned(I_TYPE))) <= '1';
-
-    --     for i in 0 to 7 loop
-    --         result(to_integer(unsigned(I_TYPE))) <= (others => '0');
-    --     end loop;
-
-    --     dec_counter(to_integer(unsigned(I_TYPE))) <= '0';
-
-
-    --         case funct3 is
-    --              when "000" => -- ADDI
-    --                 result(to_integer(unsigned(I_TYPE))) <= registerfile_rdata_rs1 + decode_imm(instruction);
-
-    --              when "001" =>
-    --                 case funct7 is
-    --                     when "0000000" => -- SLLI
-    --                         execution_done(to_integer(unsigned(I_TYPE))) <= '1';
-    --                         result(to_integer(unsigned(I_TYPE))) <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(decode_imm(instruction)(4 downto 0))), false, true);
-
-    --                     when others =>
-    --                         decode_error(to_integer(unsigned(I_TYPE))) <= '1';
-    --                 end case;
-    --              when "010" => -- SLTI
-    --                 if signed(registerfile_rdata_rs1) < signed(decode_imm(instruction)) then
-    --                     result(to_integer(unsigned(I_TYPE))) <= X"00000001";
-    --                 else
-    --                     result(to_integer(unsigned(I_TYPE))) <= (others => '0');
-    --                 end if;
-
-    --              when "011" => -- SLTIU
-    --                 if unsigned(registerfile_rdata_rs1) < unsigned(decode_imm(instruction)) then
-    --                     result(to_integer(unsigned(I_TYPE))) <= X"00000001";
-    --                 else
-    --                     result(to_integer(unsigned(I_TYPE))) <= (others => '0');
-    --                 end if;
-
-    --              when "100" => -- XORI
-    --                 result(to_integer(unsigned(I_TYPE))) <= registerfile_rdata_rs1 xor decode_imm(instruction);
-
-    --              when "101" =>
-                
-    --                 case funct7 is
-    --                     when "0000000" => -- SRLI
-    --                         result(to_integer(unsigned(I_TYPE))) <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(decode_imm(instruction)(4 downto 0))), false, false);
-
-    --                     when "0100000" => -- SRAI
-    --                         result(to_integer(unsigned(I_TYPE))) <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(decode_imm(instruction)(4 downto 0))), true, false);
-
-    --                     when others =>
-    --                         decode_error(to_integer(unsigned(I_TYPE))) <= '1';
-    --                 end case;
-    --              when "110" => -- ORI
-    --                 result(to_integer(unsigned(I_TYPE))) <= registerfile_rdata_rs1 or decode_imm(instruction);
-
-    --              when "111" => -- ANDI
-    --                 result(to_integer(unsigned(I_TYPE))) <= registerfile_rdata_rs1 and decode_imm(instruction);
-
-    --              when others =>
-    --                  decode_error(to_integer(unsigned(I_TYPE))) <= '1';
-
-    --         end case;
-    --     --end if;
-    -- end process;
+    
         eu_i_inst: eu_i PORT MAP(
         --ins
         instruction => instruction, pc=>pc,
         registerfile_rdata_rs1 => registerfile_rdata_rs1,
         registerfile_rdata_rs2 => registerfile_rdata_rs2,
-        data_wack => data_wack, funct3 => funct3, selected => selected(to_integer(unsigned(U_TYPE_AUIPC))),
+        data_wack => data_wack, funct3 => funct3, funct7 => funct7, selected => selected(to_integer(unsigned(I_TYPE))),
         --outs
         
-    imm => imm(to_integer(unsigned(U_TYPE_AUIPC))), daddr => daddr(to_integer(unsigned(U_TYPE_AUIPC))), wdata => wdata(to_integer(unsigned(U_TYPE_AUIPC))), result => result(to_integer(unsigned(U_TYPE_AUIPC))),
-    use_rs1 => use_rs1(to_integer(unsigned(U_TYPE_AUIPC))),use_rs2 => use_rs2(to_integer(unsigned(U_TYPE_AUIPC))),use_rd => use_rd(to_integer(unsigned(U_TYPE_AUIPC))), execution_done => execution_done(to_integer(unsigned(U_TYPE_AUIPC))), decode_error => decode_error(to_integer(unsigned(U_TYPE_AUIPC))), dwe => dwe(to_integer(unsigned(U_TYPE_AUIPC)))
+    imm => imm(to_integer(unsigned(I_TYPE))), daddr => daddr(to_integer(unsigned(I_TYPE))), wdata => wdata(to_integer(unsigned(I_TYPE))), result => result(to_integer(unsigned(I_TYPE))),
+    use_rs1 => use_rs1(to_integer(unsigned(I_TYPE))),use_rs2 => use_rs2(to_integer(unsigned(I_TYPE))),use_rd => use_rd(to_integer(unsigned(I_TYPE))), execution_done => execution_done(to_integer(unsigned(I_TYPE))), decode_error => decode_error(to_integer(unsigned(I_TYPE))), dwe => dwe(to_integer(unsigned(I_TYPE)))
     );
 
 
