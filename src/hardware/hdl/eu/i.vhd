@@ -1,4 +1,3 @@
-
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
@@ -127,6 +126,10 @@ architecture behavioural of eu_i is
     end function;
 
 
+        type word_t is array (natural range <>) of std_logic_vector(31 downto 0);
+    signal i_result : word_t(7 downto 0);
+
+
 begin
     decode_i_type: process(instruction, funct3, funct7, registerfile_rdata_rs1, pc) --clk, pc)
     begin
@@ -145,59 +148,80 @@ begin
         dec_counter <= '0';
 
 
-            case funct3 is
-                 when "000" => -- ADDI
-                    result <= registerfile_rdata_rs1 + decode_imm(instruction);
+            -- case funct3 is
+            --      when "000" => -- ADDI
+            --         result <= registerfile_rdata_rs1 + decode_imm(instruction);
 
-                 when "001" =>
-                    case funct7 is
-                        when "0000000" => -- SLLI
-                            execution_done <= '1';
-                            result <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(decode_imm(instruction)(4 downto 0))), false, true);
+            --      when "001" =>
+            --         case funct7 is
+            --             when "0000000" => -- SLLI
+            --                 execution_done <= '1';
+            --                 result <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(decode_imm(instruction)(4 downto 0))), false, true);
 
-                        when others =>
-                            decode_error <= '1';
-                    end case;
-                 when "010" => -- SLTI
-                    if signed(registerfile_rdata_rs1) < signed(decode_imm(instruction)) then
-                        result <= X"00000001";
-                    else
-                        result <= (others => '0');
-                    end if;
+            --             when others =>
+            --                 decode_error <= '1';
+            --         end case;
+            --      when "010" => -- SLTI
+            --         if signed(registerfile_rdata_rs1) < signed(decode_imm(instruction)) then
+            --             result <= X"00000001";
+            --         else
+            --             result <= (others => '0');
+            --         end if;
 
-                 when "011" => -- SLTIU
-                    if unsigned(registerfile_rdata_rs1) < unsigned(decode_imm(instruction)) then
-                        result <= X"00000001";
-                    else
-                        result <= (others => '0');
-                    end if;
+            --      when "011" => -- SLTIU
+            --         if unsigned(registerfile_rdata_rs1) < unsigned(decode_imm(instruction)) then
+            --             result <= X"00000001";
+            --         else
+            --             result <= (others => '0');
+            --         end if;
 
-                 when "100" => -- XORI
-                    result <= registerfile_rdata_rs1 xor decode_imm(instruction);
+            --      when "100" => -- XORI
+            --         result <= registerfile_rdata_rs1 xor decode_imm(instruction);
 
-                 when "101" =>
+            --      when "101" =>
                 
-                    case funct7 is
-                        when "0000000" => -- SRLI
-                            result <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(decode_imm(instruction)(4 downto 0))), false, false);
+            --         case funct7 is
+            --             when "0000000" => -- SRLI
+            --                 result <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(decode_imm(instruction)(4 downto 0))), false, false);
 
-                        when "0100000" => -- SRAI
-                            result <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(decode_imm(instruction)(4 downto 0))), true, false);
+            --             when "0100000" => -- SRAI
+            --                 result <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(decode_imm(instruction)(4 downto 0))), true, false);
 
-                        when others =>
-                            decode_error <= '1';
-                    end case;
-                 when "110" => -- ORI
-                    result <= registerfile_rdata_rs1 or decode_imm(instruction);
+            --             when others =>
+            --                 decode_error <= '1';
+            --         end case;
+            --      when "110" => -- ORI
+            --         result <= registerfile_rdata_rs1 or decode_imm(instruction);
 
-                 when "111" => -- ANDI
-                    result <= registerfile_rdata_rs1 and decode_imm(instruction);
+            --      when "111" => -- ANDI
+            --         result <= registerfile_rdata_rs1 and decode_imm(instruction);
 
-                 when others =>
-                     decode_error <= '1';
+            --      when others =>
+            --          decode_error <= '1';
 
-            end case;
+            -- end case;
         --end if;
     end process;
+
+
+
+    i_result(0) <= registerfile_rdata_rs1 + decode_imm(instruction);
+    i_result(1) <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(decode_imm(instruction)(4 downto 0))), false, true);
+    i_result(2) <= X"00000001" when  signed(registerfile_rdata_rs1) < signed(decode_imm(instruction)) else X"00000000";
+    i_result(3) <= X"00000001" when   unsigned(registerfile_rdata_rs1) < unsigned(decode_imm(instruction)) else X"00000000";
+    i_result(4) <= registerfile_rdata_rs1 xor decode_imm(instruction);
+
+    i_result(6) <= registerfile_rdata_rs1 or decode_imm(instruction);
+    i_result(7) <= registerfile_rdata_rs1 and decode_imm(instruction);
+
+    i_result(5) <=  DoShift(registerfile_rdata_rs1, to_integer(unsigned(decode_imm(instruction)(4 downto 0))), false, false) when funct7 = "0000000" else  DoShift(registerfile_rdata_rs1, to_integer(unsigned(decode_imm(instruction)(4 downto 0))), true, false) when funct7 = "0100000" else (others => '0');
+
+
+    result <= i_result(to_integer(unsigned(funct3)));
+
+
+
+
+
 
 end behavioural;

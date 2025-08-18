@@ -3,6 +3,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use IEEE.std_logic_unsigned.all;
 
+
+
 entity cpu is
     generic (entry_point : std_logic_vector(31 downto 0) := X"80010000");
 
@@ -89,7 +91,7 @@ architecture behavioural of cpu is
 
     attribute syn_encoding : string; 
     attribute syn_encoding of state_t : type is "one-hot";
-    attribute syn_encoding of pc_sel_t : type is "one-hot";
+--    attribute syn_encoding of pc_sel_t : type is "one-hot";
 
     signal state, n_state : state_t;
 
@@ -286,6 +288,40 @@ component eu_r is
   );
 end component;
 
+
+
+component eu_jal is
+    generic (entry_point : std_logic_vector(31 downto 0) := X"80010000");
+
+  Port (
+    instruction, registerfile_rdata_rs1, registerfile_rdata_rs2,pc : in std_logic_vector(31 downto 0);
+    
+    funct7 : in std_logic_vector(6 downto 0);
+    funct3 : in std_logic_vector(2 downto 0);
+
+    data_wack, selected : in std_logic;
+
+    imm, daddr, wdata, result : out std_logic_vector(31 downto 0);
+    use_rs1,use_rs2,use_rd, execution_done, decode_error, dwe : out std_logic
+    );
+end component;
+
+component eu_jalr is
+    generic (entry_point : std_logic_vector(31 downto 0) := X"80010000");
+
+  Port (
+    instruction, registerfile_rdata_rs1, registerfile_rdata_rs2,pc : in std_logic_vector(31 downto 0);
+    
+    funct7 : in std_logic_vector(6 downto 0);
+    funct3 : in std_logic_vector(2 downto 0);
+
+    data_wack, selected : in std_logic;
+
+    imm, daddr, wdata, result : out std_logic_vector(31 downto 0);
+    use_rs1,use_rs2,use_rd, execution_done, decode_error, dwe : out std_logic
+    );
+end component;
+
 --type dim3_t is array (0 to 127, 0 to 7, 0 to 127) of std_logic_vector(31 downto 0);
 --signal result : dim3_t;
 --signal result : std_logic_vector(31 downto 0);
@@ -416,6 +452,8 @@ begin
         end case;
     end process;
 
+    -- n_pc <= next_pc(to_integer(unsigned(opcode)))
+
     synchronous: process(rst, clk)
     begin
         if rst = '1' then
@@ -490,23 +528,7 @@ begin
     use_rs1 => use_rs1(to_integer(unsigned(U_TYPE_AUIPC))),use_rs2 => use_rs2(to_integer(unsigned(U_TYPE_AUIPC))),use_rd => use_rd(to_integer(unsigned(U_TYPE_AUIPC))), execution_done => execution_done(to_integer(unsigned(U_TYPE_AUIPC))), decode_error => decode_error(to_integer(unsigned(U_TYPE_AUIPC))), dwe => dwe(to_integer(unsigned(U_TYPE_AUIPC)))
     );
 
-    -- decode_store: process(instruction, pc, registerfile_rdata_rs1, registerfile_rdata_rs2, data_wack, funct3, selected(to_integer(unsigned(S_TYPE))))
-    -- begin
-    --     imm(to_integer(unsigned(S_TYPE))) <= decode_imm(instruction);
-    --     for i in 0 to 7 loop
-    --         result(to_integer(unsigned(S_TYPE))) <= decode_imm(instruction);
-    --     end loop;
-    --     use_rs1(to_integer(unsigned(S_TYPE))) <= '1';
-    --     use_rs2(to_integer(unsigned(S_TYPE))) <= '1';
-    --     -- next_pc(to_integer(unsigned(S_TYPE))) <= pc + X"00000004";
-    --     execution_done(to_integer(unsigned(S_TYPE))) <= data_wack;
-    --     decode_error(to_integer(unsigned(S_TYPE))) <= '0';
-
-    --     daddr(to_integer(unsigned(S_TYPE))) <= registerfile_rdata_rs1 + decode_imm(instruction);
-    --     wdata(to_integer(unsigned(S_TYPE)))<= registerfile_rdata_rs2;
-    --     dwe(to_integer(unsigned(S_TYPE))) <= selected(to_integer(unsigned(S_TYPE)));
-    --     instruction_details_array(to_integer(unsigned(S_TYPE))).data_width <= funct3(1 downto 0);
-    -- end process;
+    
 
     
 
@@ -548,60 +570,9 @@ begin
 
     end process;
 
-    -- execution_done(55) <= '1';
-    -- decode_lui: process(instruction, pc)
-    -- begin
-    --     imm(to_integer(unsigned(U_TYPE_LUI))) <= decode_imm(instruction);
-    --     for i in 0 to 7 loop
-    --         result(to_integer(unsigned(U_TYPE_LUI))) <= decode_imm(instruction);
-    --     end loop;
-    --     use_rd(to_integer(unsigned(U_TYPE_LUI))) <= '1';
-    --     decode_error(to_integer(unsigned(U_TYPE_LUI))) <= '0';
-    -- end process;
 
-    -- execution_done(23) <= '1';
-    -- decode_auipc: process(instruction, pc)
-    -- begin
-    --     imm(to_integer(unsigned(U_TYPE_AUIPC))) <= decode_imm(instruction);
-    --     use_rd(to_integer(unsigned(U_TYPE_AUIPC))) <= '1';
-    --     for i in 0 to 7 loop
-    --         result(to_integer(unsigned(U_TYPE_AUIPC))) <= pc + decode_imm(instruction);
-    --     end loop;
-    --     -- next_pc(to_integer(unsigned(U_TYPE_AUIPC))) <= pc + X"00000004";
-    --     --execution_done(to_integer(unsigned(U_TYPE_AUIPC))) <= '1';
-    --     decode_error(to_integer(unsigned(U_TYPE_AUIPC))) <= '0';
-    -- end process;
-
-    execution_done(111) <= '1';
-    decode_jal: process(instruction, pc)
-    begin
-        imm(to_integer(unsigned(J_TYPE_JAL))) <= decode_imm(instruction);
-        use_rd(to_integer(unsigned(J_TYPE_JAL))) <= '1';
-
-        for i in 0 to 7 loop
-            result(to_integer(unsigned(J_TYPE_JAL))) <= pc + X"00000004";
-        end loop;
-
-        n_pc_sel_array(to_integer(unsigned(J_TYPE_JAL))) <= PC_PLUS_IMM;
-        -- next_pc(to_integer(unsigned(J_TYPE_JAL))) <= pc + decode_imm(instruction);
-        --execution_done(to_integer(unsigned(J_TYPE_JAL))) <= '1';
-        decode_error(to_integer(unsigned(J_TYPE_JAL))) <= '0';
-    end process;
-
-    execution_done(103) <= '1';
-    decode_jalr: process(registerfile_rdata_rs1, pc, instruction)
-    begin
-        imm(to_integer(unsigned(J_TYPE_JALR))) <= decode_imm(instruction);
-        use_rd(to_integer(unsigned(J_TYPE_JALR))) <= '1';
-        use_rs1(to_integer(unsigned(J_TYPE_JALR))) <= '1';
-        for i in 0 to 7 loop
-            result(to_integer(unsigned(J_TYPE_JALR))) <= pc + X"00000004";
-        end loop;
-        n_pc_sel_array(to_integer(unsigned(J_TYPE_JALR))) <= RS1_PLUS_IMM;
-        -- next_pc(to_integer(unsigned(J_TYPE_JALR))) <= (decode_imm(instruction) + registerfile_rdata_rs1) and X"FFFFFFFE"; --(pc + registerfile_rdata_rs1) and X"FFFFFFFE";
-        --execution_done(to_integer(unsigned(J_TYPE_JALR))) <= '1';
-        decode_error(to_integer(unsigned(J_TYPE_JALR))) <= '0';
-    end process;
+    n_pc_sel_array(to_integer(unsigned(J_TYPE_JALR))) <= RS1_PLUS_IMM;
+        
 
     execution_done(99) <= '1';
     decode_b_type: process(funct3, registerfile_rdata_rs1, registerfile_rdata_rs2, instruction, pc)
@@ -622,27 +593,27 @@ begin
         case funct3 is
             when "000" => -- BEQ
                 if signed(registerfile_rdata_rs1) = signed(registerfile_rdata_rs2) then
-                    n_pc_sel_array(to_integer(unsigned(B_TYPE))) <= PC_PLUS_IMM; -- next_pc(to_integer(unsigned(B_TYPE))) <= pc + decode_imm(instruction);
+                    n_pc_sel_array(to_integer(unsigned(B_TYPE))) <= PC_PLUS_IMM;
                 end if;
             when "001" => -- BNE
                 if signed(registerfile_rdata_rs1) /= signed(registerfile_rdata_rs2) then
-                    n_pc_sel_array(to_integer(unsigned(B_TYPE))) <= PC_PLUS_IMM; -- next_pc(to_integer(unsigned(B_TYPE))) <= pc + decode_imm(instruction);
+                    n_pc_sel_array(to_integer(unsigned(B_TYPE))) <= PC_PLUS_IMM;
                 end if;
             when "100" => -- BLT
                 if signed(registerfile_rdata_rs1) < signed(registerfile_rdata_rs2) then
-                    n_pc_sel_array(to_integer(unsigned(B_TYPE))) <= PC_PLUS_IMM; -- next_pc(to_integer(unsigned(B_TYPE))) <= pc + decode_imm(instruction);
+                    n_pc_sel_array(to_integer(unsigned(B_TYPE))) <= PC_PLUS_IMM;
                 end if;
             when "101" => -- BGE
                 if signed(registerfile_rdata_rs1) >= signed(registerfile_rdata_rs2) then
-                    n_pc_sel_array(to_integer(unsigned(B_TYPE))) <= PC_PLUS_IMM; -- next_pc(to_integer(unsigned(B_TYPE))) <= pc + decode_imm(instruction);
+                    n_pc_sel_array(to_integer(unsigned(B_TYPE))) <= PC_PLUS_IMM;
                 end if;
             when "110" => -- BLTU
                 if unsigned(registerfile_rdata_rs1) < unsigned(registerfile_rdata_rs2) then
-                    n_pc_sel_array(to_integer(unsigned(B_TYPE))) <= PC_PLUS_IMM; -- next_pc(to_integer(unsigned(B_TYPE))) <= pc + decode_imm(instruction);
+                    n_pc_sel_array(to_integer(unsigned(B_TYPE))) <= PC_PLUS_IMM;
                 end if;
             when "111" => -- BGEU
                 if unsigned(registerfile_rdata_rs1) >= unsigned(registerfile_rdata_rs2) then
-                    n_pc_sel_array(to_integer(unsigned(B_TYPE))) <= PC_PLUS_IMM; -- next_pc(to_integer(unsigned(B_TYPE))) <= pc + decode_imm(instruction);
+                    n_pc_sel_array(to_integer(unsigned(B_TYPE))) <= PC_PLUS_IMM;
                 end if;
             when others =>
                 decode_error(to_integer(unsigned(B_TYPE))) <= '1';
@@ -662,17 +633,45 @@ begin
     );
 
     
-        eu_i_inst: eu_i PORT MAP(
+    eu_i_inst: eu_i PORT MAP(
         --ins
         instruction => instruction, pc=>pc,
         registerfile_rdata_rs1 => registerfile_rdata_rs1,
         registerfile_rdata_rs2 => registerfile_rdata_rs2,
         data_wack => data_wack, funct3 => funct3, funct7 => funct7, selected => selected(to_integer(unsigned(I_TYPE))),
         --outs
-        
-    imm => imm(to_integer(unsigned(I_TYPE))), daddr => daddr(to_integer(unsigned(I_TYPE))), wdata => wdata(to_integer(unsigned(I_TYPE))), result => result(to_integer(unsigned(I_TYPE))),
-    use_rs1 => use_rs1(to_integer(unsigned(I_TYPE))),use_rs2 => use_rs2(to_integer(unsigned(I_TYPE))),use_rd => use_rd(to_integer(unsigned(I_TYPE))), execution_done => execution_done(to_integer(unsigned(I_TYPE))), decode_error => decode_error(to_integer(unsigned(I_TYPE))), dwe => dwe(to_integer(unsigned(I_TYPE)))
+
+        imm => imm(to_integer(unsigned(I_TYPE))), daddr => daddr(to_integer(unsigned(I_TYPE))), wdata => wdata(to_integer(unsigned(I_TYPE))), result => result(to_integer(unsigned(I_TYPE))),
+        use_rs1 => use_rs1(to_integer(unsigned(I_TYPE))),use_rs2 => use_rs2(to_integer(unsigned(I_TYPE))),use_rd => use_rd(to_integer(unsigned(I_TYPE))), execution_done => execution_done(to_integer(unsigned(I_TYPE))), decode_error => decode_error(to_integer(unsigned(I_TYPE))), dwe => dwe(to_integer(unsigned(I_TYPE)))
     );
+
+
+    eu_jal_inst: eu_jal PORT MAP(
+        --ins
+        instruction => instruction, pc=>pc,
+        registerfile_rdata_rs1 => registerfile_rdata_rs1,
+        registerfile_rdata_rs2 => registerfile_rdata_rs2,
+        data_wack => data_wack, funct3 => funct3, funct7 => funct7, selected => selected(to_integer(unsigned(I_TYPE))),
+        --outs
+
+        imm => imm(to_integer(unsigned(J_TYPE_JAL))), daddr => daddr(to_integer(unsigned(J_TYPE_JAL))), wdata => wdata(to_integer(unsigned(J_TYPE_JAL))), result => result(to_integer(unsigned(J_TYPE_JAL))),
+        use_rs1 => use_rs1(to_integer(unsigned(J_TYPE_JAL))),use_rs2 => use_rs2(to_integer(unsigned(J_TYPE_JAL))),use_rd => use_rd(to_integer(unsigned(J_TYPE_JAL))), execution_done => execution_done(to_integer(unsigned(J_TYPE_JAL))), decode_error => decode_error(to_integer(unsigned(J_TYPE_JAL))), dwe => dwe(to_integer(unsigned(J_TYPE_JAL)))
+    );
+
+        eu_jalr_inst: eu_jalr PORT MAP(
+        --ins
+        instruction => instruction, pc=>pc,
+        registerfile_rdata_rs1 => registerfile_rdata_rs1,
+        registerfile_rdata_rs2 => registerfile_rdata_rs2,
+        data_wack => data_wack, funct3 => funct3, funct7 => funct7, selected => selected(to_integer(unsigned(I_TYPE))),
+        --outs
+
+        imm => imm(to_integer(unsigned(J_TYPE_JALR))), daddr => daddr(to_integer(unsigned(J_TYPE_JALR))), wdata => wdata(to_integer(unsigned(J_TYPE_JALR))), result => result(to_integer(unsigned(J_TYPE_JALR))),
+        use_rs1 => use_rs1(to_integer(unsigned(J_TYPE_JALR))),use_rs2 => use_rs2(to_integer(unsigned(J_TYPE_JALR))),use_rd => use_rd(to_integer(unsigned(J_TYPE_JALR))), execution_done => execution_done(to_integer(unsigned(J_TYPE_JALR))), decode_error => decode_error(to_integer(unsigned(J_TYPE_JALR))), dwe => dwe(to_integer(unsigned(J_TYPE_JALR)))
+    );
+
+    n_pc_sel_array(to_integer(unsigned(J_TYPE_JAL))) <= PC_PLUS_IMM;
+
 
 
 end behavioural;
